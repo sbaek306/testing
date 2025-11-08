@@ -1,6 +1,6 @@
 # testing
 
-These are R codes for simulations, which appear in the manuscript entitled, "Testing Existence in Clinical Effect" by Baek, S., Ma, Y., Garcia, T. P. 
+These are R codes for simulations, which appear in the manuscript entitled, "Evaluating Site-Level Heterogeneity in Diagnostic Sensitivity Using Anchor Variables" by Baek, S., Ma, Y., Garcia, T. P. 
 
 Simulation 1
 
