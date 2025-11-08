@@ -5,6 +5,7 @@ These are R codes for simulations, which appear in the manuscript entitled, "Eva
 (1) "simulations" folder - R files for simulations 
 
 - e11.R/e21.R/e31.R: Simulation 1
+- p2-*.R/p3-*.R: Simulation 2
 
 (2) "power" folder - R files for computing powers
 
