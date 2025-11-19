@@ -10,4 +10,7 @@ These are R codes for simulations, which appear in the manuscript entitled, "Tes
 
 (2) "power" folder - R files for computing powers
 
+- p1-X.R (n=200)
+- p2-X.R (n=500)
+- p3-X.R (n=1000)
 
