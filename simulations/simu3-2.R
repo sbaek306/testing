@@ -1,0 +1,208 @@
+#library(rootSolve)
+library(stats)
+
+###############
+## functions ##
+###############
+
+# approximate observerd lilekelihood
+
+lik.i <- function(par,hI,o.d,v.d){
+  
+  beta <- par[1:2]
+  a <- par[3]
+  tau <- par[4]
+  
+  #print(a)
+  
+  res <- NULL
+  
+  tmp.I <- 1
+  
+  #while (tmp.I<I){
+  for (ii in 1:hI){
+    
+    ind.o <- which(o.d$I==ii)
+    ind.v <- which(v.d$I==ii)
+    o.data <- o.d[ind.o,]
+    v.data <- v.d[ind.v,]  
+    
+    t.data <- rbind(o.data,v.data)
+    
+    Po <- plogis(as.matrix(o.data[,c(1,2)]) %*% beta)
+    Pv <- plogis(as.matrix(v.data[,c(1,2)]) %*% beta)
+    
+    mi <- length(Pv)
+    #const1 <- mean(1 - exp(a)/(1+exp(a))*Pv)
+    #const2 <- mean(Pv)
+    
+    #c1 <- sum(o.data$s * exp(a)/(1+exp(a))^2)
+    #c2 <- sum( (1 - o.data$s) * exp(a) * Po * (1 - exp(2*a) + exp(2*a)*Po) 
+    #           / ( (1 + exp(a))^2 * (1 + exp(a) - exp(a) * Po)^2 ) )
+    #c3 <- sum(exp(a)/(1+exp(a))^2 * v.data$y) 
+    
+    #print(c(c1,c2,c3,sum(c1,c2,c3)))
+    #print(c(sum(o.data$s),sum(1-o.data$s),sum(v.data$y)))
+    
+    #if (cond > 0){
+    l.i0F.2 <- ( - sum(o.data$s * exp(a)/(1+exp(a))^2)
+                 - sum( (1 - o.data$s) * exp(a) * Po * (1 - exp(2*a) + exp(2*a)*Po) 
+                        / ( (1 + exp(a))^2 * (1 + exp(a) - exp(a) * Po)^2 ) )
+                 - sum(exp(a)/(1+exp(a))^2 * v.data$y) 
+                # + mi*const2*(exp(a)/(1+exp(a))^2/const1 - 2*exp(2*a)/(1+exp(a))^3/const1 
+                #              + exp(2*a)/(1+exp(a))^3/const1) 
+    )
+    #} else {
+    #  l.i0F.2 <- ( - sum(o.data$s * exp(a)/(1+exp(a))^2)
+    #               - sum( (1 - o.data$s) * exp(a) * (Po+0.1) * (1 - exp(2*a) + exp(2*a)*(Po+0.1)) 
+    #                      / ( (1 + exp(a))^2 * (1 + exp(a) - exp(a) * (Po+0.1))^2 ) )
+    #               - sum(exp(a)/(1+exp(a))^2 * v.data$y) 
+    #  )
+    #}
+    
+    #if (l.i0F.2 < 0){
+    
+    l.i0F <- ( sum(o.data$s * ( log(exp(a)/(1+exp(a))) + log(Po) )
+                   + (1 - o.data$s) * log(1-exp(a)/(1+exp(a))*Po) )
+               + sum( v.data$y * ( -log(1+exp(a)) + log(Pv) )
+                      + (1 - v.data$y) * log(1 - Pv) )
+               + sum(dnorm(t.data[,2],1,1,log=TRUE)) #+ sum(dnorm(v.data[,2],1,sqrt(1),log=TRUE))
+              #  - mi*log(const1)
+    )
+    
+    # l.i0F...normal density parameter -> need to be careful
+    
+    l.i0F.1 <- ( sum(o.data$s /(1+exp(a)) - (1 - o.data$s) * exp(a) * Po /
+                       ((1 + exp(a)) * (1 + exp(a) - exp(a) * Po))) 
+                 - sum(v.data$y * exp(a)/(1+exp(a)))   
+               #  + mi*exp(a)*const2/(1+exp(a))^2/const1
+    )
+    #res[tmp.I] <- 0.5 * log(1 - tau*l.i0F.2) - l.i0F - 0.5 * tau*(l.i0F.1^2) / (1-tau*l.i0F.2) # minus logL
+    res[ii] <- 0.5 * log(1 - tau*l.i0F.2) - l.i0F - 0.5 * tau*(l.i0F.1^2) / (1-tau*l.i0F.2) # minus logL
+    #  tmp.I <- tmp.I + 1
+    
+    # } 
+    #print(o.d[1,])
+  }
+  #print(dat[[1]][1,])
+  #ind <- which(is.na(res)==1)
+  tmp <- res[complete.cases(res)]
+  #h5 <- quantile(tmp,0.95);l5 <- quantile(tmp,0.05)
+  #tmp2 <- tmp[which(tmp <= h5 & tmp >= l5)]
+  #print(tmp)
+  return(sum(tmp))
+}
+
+#################
+## simulations ##
+#################
+
+simu <- function(simuno,seedn,toI,n,true.beta,true.a,tt,rr){
+  
+  #simuno <- 1
+  est = est2 <- matrix(0,simuno,5)
+  err <- NULL 
+  # true beta
+  #beta <- c(1,-5) # prevalence of Y: 10%
+  #I <- 1000
+  #n <- 100
+  #a <- 3
+  s.tt <- sqrt(tt)
+  beta <- true.beta 
+  a <- true.a 
+  
+  set.seed(seedn+10)
+  
+  tmp.iter <- 1
+  iter <- 1
+  
+  while (simuno >= tmp.iter){
+  #for (jj in 1:simuno){
+    
+    br <- rnorm(toI,0,s.tt) # random bi's
+    
+    v.d = o.d <- NULL
+    
+    for (ii in 1:toI){
+      # generate X
+      x1 <- rnorm(n,1,1)
+      x <- as.matrix(cbind(rep(1,n),x1))
+      
+      # generate Y
+      p <- plogis(x %*% beta)
+      y <- rbinom(n,1,p)
+      
+      # generate S
+      b <- br[ii]
+      s <- rep(0,n)
+      sp <- exp(a+b)/(1+exp(a+b))
+      for (i in 1:n) {
+        if (y[i]==1){
+          s[i] <- rbinom(1,1,sp)} else {s[i]==0}
+      }
+      
+      # data
+      full.data <- data.frame(x,s,y)
+      r <- rr # the proportion of validation subset
+      tmp <- rbinom(sum(full.data$s==0),1,r) # available Y 
+      R <- rep(0,n)
+      R[which(full.data$s==0)] <- tmp
+      
+      v.ind <- which(R==1)
+      v.data <- data.frame(full.data[v.ind,]) # validation data whose Y will be used.
+      o.data <- data.frame(full.data[-v.ind,]) # y will not be used.
+      
+      v.data$I <- ii # add indices for i
+      o.data$I <- ii # add indices for i
+      
+      v.d <- rbind(v.d,v.data)
+      o.d <- rbind(o.d,o.data)
+    }
+    
+    pert <- abs(c(true.beta,true.a,tt) * 0.1)
+    par0 <- c(true.beta,true.a,tt) + c(runif(3,-pert,pert),runif(1,0,0.002)) ################ for simulation
+    #print(par0)
+    #optim.est <- try(optim(par0,lik.i.ba,gr=NULL,method="Nelder-Mead",control=list(maxit=50),hI=toI,n=n,true.beta=true.beta,true.a=true.a,s.tt=s.tt,rr=rr),silent=TRUE)
+    #optim.est <- try(optim(par0,lik.i,gr=NULL,method="Nelder-Mead",control=list(maxit=100),hI=toI,o.d=o.d,v.d=v.d),silent=TRUE)
+    #optim.est <- try(optim(par0,lik.i,gr=NULL,method="SANN",control=list(maxit=50),I=toI,n=n,true.beta=true.beta,true.a=true.a,s.tt=s.tt,rr=rr),silent=TRUE)
+    A <- matrix(c(0,0,0,1),1,4,byrow=TRUE)
+    optim.est <- try(constrOptim(par0,lik.i,grad=NULL,ui=A,ci=c(0),method="Nelder-Mead",control=list(maxit=200),hI=toI,o.d=o.d,v.d=v.d),silent=TRUE)
+    
+    if (is.character(optim.est)){ 
+      est[tmp.iter,] <- NA 
+      est[tmp.iter,5] <- optim.est$convergence
+    } else if (optim.est$convergence==0){
+      est[tmp.iter,1:4] <- optim.est$par
+      cat('tmp.iter = ',tmp.iter,'\n')
+      tmp.iter <- tmp.iter + 1
+    }
+    #cat('iter = ',tmp.iter,'\n',est[tmp.iter,],'\n')
+    cat('iter = ',iter,'\n')
+    iter <- iter + 1
+    #print(err[jj])
+  }
+  
+  return(est)
+}
+
+
+#est1 <- simu(simuno=200,seedn=100,toI=20,n=40,true.beta=c(1,-5),true.a=2,tt=0.02,rr=0.5)
+#save(est1, file = "en1.RData")
+#est2 <- simu(simuno=200,seedn=101,toI=20,n=30,true.beta=c(1,-5),true.a=2,tt=0.02,rr=0.5)
+#save(est2, file = "en2.RData")
+#est3 <- simu(simuno=200,seedn=102,toI=20,n=100,true.beta=c(1,-5),true.a=2,tt=0.02,rr=0.5)
+#save(est3, file = "en3.RData")
+#est4 <- simu(simuno=200,seedn=103,toI=20,n=500,true.beta=c(1,-5),true.a=2,tt=0.02,rr=0.5)
+#save(est4, file = "en4.RData")
+
+est5 <- simu(simuno=200,seedn=110,toI=10,n=40,true.beta=c(1,-5),true.a=2,tt=0.02,rr=0.5)
+save(est5, file = "ei1.RData")
+est6 <- simu(simuno=200,seedn=120,toI=20,n=40,true.beta=c(1,-5),true.a=2,tt=0.02,rr=0.5)
+save(est6, file = "ei2.RData")
+est7 <- simu(simuno=200,seedn=130,toI=50,n=40,true.beta=c(1,-5),true.a=2,tt=0.02,rr=0.5)
+save(est7, file = "ei3.RData")
+est8 <- simu(simuno=200,seedn=140,toI=100,n=40,true.beta=c(1,-5),true.a=2,tt=0.02,rr=0.5)
+save(est8, file = "ei4.RData")
+
+
+
